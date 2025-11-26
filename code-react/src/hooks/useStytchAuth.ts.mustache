@@ -1,0 +1,71 @@
+import { useStytch, useStytchUser, useStytchSession } from '@stytch/react';
+import { useCallback, useEffect, useState } from 'react';
+
+/**
+ * Custom hook for Stytch authentication.
+ *
+ * Provides:
+ * - User information from Stytch session
+ * - Session token for API calls
+ * - Login/logout functions
+ * - Loading and error states
+ */
+export function useStytchAuth() {
+  const stytch = useStytch();
+  const { user } = useStytchUser();
+  const { session } = useStytchSession();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Get session token for API calls
+  const getToken = useCallback(async (): Promise<string | null> => {
+    if (!session) {
+      return null;
+    }
+    return session.session_token;
+  }, [session]);
+
+  // Authenticate with email magic link
+  const loginWithMagicLink = useCallback(async (email: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await stytch.magicLinks.email.loginOrCreate(email);
+      // User will receive email with magic link
+      return { success: true };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send magic link';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [stytch]);
+
+  // Logout
+  const logout = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await stytch.session.revoke();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to logout';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [stytch]);
+
+  return {
+    user,
+    session,
+    isAuthenticated: !!user && !!session,
+    isLoading,
+    error,
+    getToken,
+    loginWithMagicLink,
+    logout,
+  };
+}

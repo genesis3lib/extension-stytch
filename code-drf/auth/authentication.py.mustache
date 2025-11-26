@@ -1,0 +1,120 @@
+"""
+Stytch authentication for Django REST Framework.
+
+This module provides Stytch session token validation for DRF views.
+It integrates with extension-rbac for role-based access control.
+"""
+
+from django.conf import settings
+from rest_framework import authentication, exceptions
+from stytch import Client as StytchClient
+
+
+class StytchJSONWebTokenAuthentication(authentication.BaseAuthentication):
+    """
+    Authenticate users using Stytch session tokens.
+
+    The token should be included in the Authorization header:
+    Authorization: Bearer <session_token>
+
+    This authentication class:
+    - Validates the Stytch session token
+    - Extracts user information from the session
+    - Extracts roles from custom claims for RBAC
+    - Syncs user to local database
+    """
+
+    def authenticate(self, request):
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+
+        if not auth_header.startswith('Bearer '):
+            return None
+
+        token = auth_header.split(' ')[1]
+
+        try:
+            # Validate token with Stytch
+            payload = self._verify_token(token)
+
+            # Get or create user
+            user = self._get_or_create_user(payload)
+
+            return (user, token)
+
+        except Exception as e:
+            raise exceptions.AuthenticationFailed(f'Invalid token: {str(e)}')
+
+    def _verify_token(self, token):
+        """Verify Stytch session token and return payload."""
+        stytch_project_id = getattr(settings, 'STYTCH_PROJECT_ID', None)
+        stytch_secret = getattr(settings, 'STYTCH_SECRET', None)
+
+        if not stytch_project_id or not stytch_secret:
+            raise exceptions.AuthenticationFailed('Stytch not configured')
+
+        # Initialize Stytch client
+        client = StytchClient(
+            project_id=stytch_project_id,
+            secret=stytch_secret,
+        )
+
+        # Authenticate session
+        response = client.sessions.authenticate(session_token=token)
+
+        if response.status_code != 200:
+            raise exceptions.AuthenticationFailed('Invalid session token')
+
+        return response
+
+    def _get_or_create_user(self, stytch_response):
+        """Get or create Django user from Stytch session."""
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
+        # Extract user information
+        session = stytch_response.session
+        user_id = session.user_id
+
+        # Get email from user object
+        stytch_user = stytch_response.user
+        email = None
+        if stytch_user.emails and len(stytch_user.emails) > 0:
+            email = stytch_user.emails[0].email
+
+        # Get or create user
+        user, created = User.objects.get_or_create(
+            username=user_id,
+            defaults={
+                'email': email or f'{user_id}@stytch.local',
+            }
+        )
+
+        # Update email if it changed
+        if email and user.email != email:
+            user.email = email
+            user.save()
+
+        # Extract and sync roles if RBAC is enabled
+        self._sync_user_roles(user, session.custom_claims)
+
+        return user
+
+    def _sync_user_roles(self, user, claims):
+        """Sync user roles from Stytch claims to local database."""
+        role_claim_key = getattr(settings, 'STYTCH_ROLE_CLAIM_KEY', '{{{roleClaimKey}}}')
+
+        if role_claim_key not in claims:
+            return
+
+        roles = claims.get(role_claim_key, [])
+        if not isinstance(roles, list):
+            roles = [roles]
+
+        # Sync roles using RBAC extension if available
+        try:
+            from rbac.services import sync_user_roles
+            sync_user_roles(user, roles)
+        except ImportError:
+            # RBAC extension not available
+            pass

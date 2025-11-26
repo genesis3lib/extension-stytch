@@ -1,0 +1,68 @@
+package {{packageName}}.config;
+
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+
+import java.util.Collection;
+import java.util.Map;
+
+/**
+ * Authentication token for Stytch-authenticated users.
+ *
+ * Contains:
+ * - User ID from Stytch
+ * - Email address
+ * - Granted authorities (roles) for RBAC
+ * - All JWT claims for custom use
+ * - Optional tenant ID for multi-tenant B2B apps
+ */
+public class StytchAuthenticationToken extends AbstractAuthenticationToken {
+
+    private final String userId;
+    private final String email;
+    private final Map<String, Object> claims;
+    private final String tenantId;
+
+    public StytchAuthenticationToken(String userId, String email,
+                                     Collection<? extends GrantedAuthority> authorities,
+                                     Map<String, Object> claims,
+                                     String tenantId) {
+        super(authorities);
+        this.userId = userId;
+        this.email = email;
+        this.claims = claims;
+        this.tenantId = tenantId;
+        setAuthenticated(true);
+    }
+
+    @Override
+    public Object getCredentials() {
+        return null;
+    }
+
+    @Override
+    public Object getPrincipal() {
+        return userId;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public Map<String, Object> getClaims() {
+        return claims;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    @Override
+    public String getName() {
+        return email != null ? email : userId;
+    }
+}

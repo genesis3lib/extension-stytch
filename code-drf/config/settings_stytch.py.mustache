@@ -1,0 +1,23 @@
+"""
+Stytch configuration for Django settings.
+
+Add these settings to your Django settings.py:
+    from config.settings_stytch import *
+"""
+
+import os
+
+# Stytch Configuration
+STYTCH_PROJECT_ID = os.getenv('STYTCH_PROJECT_ID')
+STYTCH_SECRET = os.getenv('STYTCH_SECRET')
+STYTCH_ROLE_CLAIM_KEY = os.getenv('STYTCH_ROLE_CLAIM_KEY', '{{{roleClaimKey}}}')
+{{#tenantIdClaimKey}}
+STYTCH_TENANT_ID_CLAIM_KEY = os.getenv('STYTCH_TENANT_ID_CLAIM_KEY', '{{{tenantIdClaimKey}}}')
+{{/tenantIdClaimKey}}
+
+# Add Stytch authentication to REST framework
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'auth.authentication.StytchJSONWebTokenAuthentication',
+    ],
+}

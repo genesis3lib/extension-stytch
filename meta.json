@@ -1,0 +1,113 @@
+{
+  "version": "3.0.0",
+  "metadata": {
+    "id": "extension-stytch",
+    "name": "Stytch Authentication",
+    "kind": "extension",
+    "type": "stytch",
+    "description": "Add Stytch passwordless authentication and authorization with RBAC support",
+    "tags": [
+      "authentication",
+      "security",
+      "oauth2",
+      "rbac",
+      "stytch"
+    ],
+    "compatibleWith": [
+      "spring",
+      "react",
+      "drf"
+    ],
+    "dependsOn": [
+      "extension-rbac"
+    ],
+    "springProfiles": [
+      "stytch"
+    ],
+    "affiliateUrl": "",
+    "providesFragments": {
+      "authentication-provider": {
+        "mode": "conflict",
+        "notes": "Provides Stytch passwordless authentication across backend and frontend"
+      }
+    },
+    "onConflict": {
+      "message": "Choose only one authentication provider (Auth0, Okta, or Stytch)"
+    }
+  },
+  "scaffoldConfigTemplate": [
+    {
+      "key": "enableRbac",
+      "label": "Enable Role-Based Access Control (RBAC)",
+      "type": "boolean",
+      "default": true,
+      "required": true,
+      "description": "Enable RBAC integration with extension-rbac for role and permission management"
+    },
+    {
+      "key": "roleClaimKey",
+      "label": "Role Claim Key",
+      "type": "text",
+      "default": "roles",
+      "required": true,
+      "description": "The claim name in Stytch session JWT that contains user roles",
+      "visibleIf": "enableRbac === true"
+    },
+    {
+      "key": "tenantIdClaimKey",
+      "label": "Tenant ID Claim Key",
+      "type": "text",
+      "default": "organization_id",
+      "required": false,
+      "description": "The claim name for tenant/organization ID (for multi-tenant B2B apps)",
+      "visibleIf": "enableRbac === true"
+    }
+  ],
+  "runtimeConfigTemplate": [
+    {
+      "key": "STYTCH_PROJECT_ID",
+      "description": "Stytch project ID (e.g., project-live-xxxxx)",
+      "required": true,
+      "secret": false,
+      "targets": [
+        "backend",
+        "frontend"
+      ],
+      "commonForAllEnv": true
+    },
+    {
+      "key": "STYTCH_SECRET",
+      "description": "Stytch project secret (backend only)",
+      "required": true,
+      "secret": true,
+      "targets": [
+        "backend"
+      ],
+      "commonForAllEnv": false
+    },
+    {
+      "key": "STYTCH_PUBLIC_TOKEN",
+      "description": "Stytch public token for frontend (e.g., public-token-live-xxxxx)",
+      "required": true,
+      "secret": false,
+      "targets": [
+        "frontend"
+      ],
+      "commonForAllEnv": true
+    }
+  ],
+  "dependencies": {
+    "gradle": [
+      "implementation 'com.stytch.java:sdk:8.2.0'"
+    ],
+    "npm": {
+      "dependencies": {
+        "@stytch/react": "^19.8.0",
+        "@stytch/vanilla-js": "^19.8.0"
+      }
+    },
+    "pip": [
+      "stytch==13.28.1"
+    ]
+  }
+}

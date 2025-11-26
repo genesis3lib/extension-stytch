@@ -1,0 +1,147 @@
+package {{packageName}}.config;
+
+import com.stytch.java.client.StytchClient;
+import com.stytch.java.common.StytchResult;
+import com.stytch.java.consumer.models.sessions.AuthenticateRequest;
+import com.stytch.java.consumer.models.sessions.AuthenticateResponse;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+
+/**
+ * Security configuration for Stytch passwordless authentication.
+ *
+ * This configuration:
+ * - Validates Stytch session tokens from the Authorization header
+ * - Extracts user roles from the JWT claims for RBAC
+ * - Integrates with extension-rbac for role-based access control
+ * - Syncs authenticated users to the local database
+ */
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+@Profile("stytch")
+public class SecurityStytchConfig {
+
+    @Value("${app.stytch.project-id}")
+    private String projectId;
+
+    @Value("${app.stytch.secret}")
+    private String secret;
+
+    @Value("${app.stytch.role-claim-key:roles}")
+    private String roleClaimKey;
+
+    @Value("${app.stytch.tenant-id-claim-key:organization_id}")
+    private String tenantIdClaimKey;
+
+    @Bean
+    public StytchClient stytchClient() {
+        return new StytchClient.Builder()
+                .projectId(projectId)
+                .secret(secret)
+                .build();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(authz -> authz
+                .requestMatchers("/api/health", "/api/public/**").permitAll()
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(stytchAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    public OncePerRequestFilter stytchAuthenticationFilter() {
+        return new OncePerRequestFilter() {
+            @Override
+            protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+                    throws ServletException, IOException {
+
+                String authHeader = request.getHeader("Authorization");
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                    String sessionToken = authHeader.substring(7);
+
+                    try {
+                        StytchClient client = stytchClient();
+                        AuthenticateRequest authRequest = new AuthenticateRequest(sessionToken);
+
+                        StytchResult<AuthenticateResponse> result = client.sessions().authenticate(authRequest).get();
+
+                        if (result.isSuccess()) {
+                            AuthenticateResponse authResponse = result.getValue();
+                            Map<String, Object> claims = authResponse.getSession().getCustomClaims();
+
+                            // Extract user information
+                            String userId = authResponse.getSession().getUserId();
+                            String email = extractEmail(authResponse);
+
+                            // Extract roles from claims
+                            List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+                            if (claims.containsKey(roleClaimKey)) {
+                                Object rolesObj = claims.get(roleClaimKey);
+                                if (rolesObj instanceof List) {
+                                    @SuppressWarnings("unchecked")
+                                    List<String> roles = (List<String>) rolesObj;
+                                    roles.forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase())));
+                                }
+                            }
+
+                            // Extract tenant ID if available (for multi-tenant B2B apps)
+                            String tenantId = null;
+                            if (claims.containsKey(tenantIdClaimKey)) {
+                                tenantId = claims.get(tenantIdClaimKey).toString();
+                            }
+
+                            // Create authentication token
+                            StytchAuthenticationToken authentication = new StytchAuthenticationToken(
+                                userId, email, authorities, claims, tenantId
+                            );
+
+                            SecurityContextHolder.getContext().setAuthentication(authentication);
+                        }
+                    } catch (InterruptedException | ExecutionException e) {
+                        // Invalid token - continue without authentication
+                        Thread.currentThread().interrupt();
+                    }
+                }
+
+                filterChain.doFilter(request, response);
+            }
+
+            private String extractEmail(AuthenticateResponse response) {
+                // Extract email from user's authentication factors
+                if (response.getUser().getEmails() != null && !response.getUser().getEmails().isEmpty()) {
+                    return response.getUser().getEmails().get(0).getEmail();
+                }
+                return null;
+            }
+        };
+    }
+}

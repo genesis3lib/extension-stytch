@@ -1,0 +1,30 @@
+import { StytchProvider as StytchReactProvider } from '@stytch/react';
+import { StytchUIClient } from '@stytch/vanilla-js';
+import React from 'react';
+
+interface StytchProviderProps {
+  children: React.ReactNode;
+}
+
+/**
+ * Stytch authentication provider for the application.
+ *
+ * Wraps the app with Stytch's React provider to enable passwordless authentication.
+ * Integrates with RBAC for role-based access control.
+ */
+export function StytchProvider({ children }: StytchProviderProps) {
+  const stytchPublicToken = import.meta.env.VITE_STYTCH_PUBLIC_TOKEN;
+
+  if (!stytchPublicToken) {
+    console.error('VITE_STYTCH_PUBLIC_TOKEN is not defined');
+    return <>{children}</>;
+  }
+
+  const stytch = new StytchUIClient(stytchPublicToken);
+
+  return (
+    <StytchReactProvider stytch={stytch}>
+      {children}
+    </StytchReactProvider>
+  );
+}

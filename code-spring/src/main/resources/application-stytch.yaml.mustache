@@ -1,0 +1,11 @@
+spring:
+  profiles: stytch
+
+app:
+  stytch:
+    project-id: ${SPRING_ENV_STYTCH_PROJECT_ID}
+    secret: ${SPRING_ENV_STYTCH_SECRET}
+    role-claim-key: ${SPRING_ENV_STYTCH_ROLE_CLAIM_KEY:{{{roleClaimKey}}}}
+{{#tenantIdClaimKey}}
+    tenant-id-claim-key: ${SPRING_ENV_STYTCH_TENANT_ID_CLAIM_KEY:{{{tenantIdClaimKey}}}}
+{{/tenantIdClaimKey}}
