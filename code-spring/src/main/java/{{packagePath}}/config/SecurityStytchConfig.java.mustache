@@ -1,4 +1,4 @@
-package {{packageName}}.config;
+package {{{javaPackageFull}}}.config;
 
 import com.stytch.java.client.StytchClient;
 import com.stytch.java.common.StytchResult;
@@ -16,6 +16,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import jakarta.servlet.FilterChain;
@@ -36,6 +37,8 @@ import java.util.concurrent.ExecutionException;
  * - Extracts user roles from the JWT claims for RBAC
  * - Integrates with extension-rbac for role-based access control
  * - Syncs authenticated users to the local database
+ * - Uses shared CORS configuration
+ * - Configurable public endpoints
  */
 @Configuration
 @EnableWebSecurity
@@ -55,6 +58,9 @@ public class SecurityStytchConfig {
     @Value("${app.stytch.tenant-id-claim-key:organization_id}")
     private String tenantIdClaimKey;
 
+    @Value("${app.security.public-uris}")
+    private String publicUris;
+
     @Bean
     public StytchClient stytchClient() {
         return new StytchClient.Builder()
@@ -64,14 +70,22 @@ public class SecurityStytchConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, CorsConfigurationSource corsConfigurationSource) throws Exception {
+        // Parse public URIs from config
+        String[] publicUriPatterns = publicUris.split(",");
+
         http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/api/health", "/api/public/**").permitAll()
-                .anyRequest().authenticated()
-            )
+            .authorizeHttpRequests(authz -> {
+                // Allow public endpoints
+                for (String pattern : publicUriPatterns) {
+                    authz.requestMatchers(pattern.trim()).permitAll();
+                }
+                // All other requests require authentication
+                authz.anyRequest().authenticated();
+            })
             .addFilterBefore(stytchAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

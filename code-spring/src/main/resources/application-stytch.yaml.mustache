@@ -2,6 +2,8 @@ spring:
   profiles: stytch
 
 app:
+  auth:
+    provider: stytch
   stytch:
     project-id: ${SPRING_ENV_STYTCH_PROJECT_ID}
     secret: ${SPRING_ENV_STYTCH_SECRET}
