@@ -26,7 +26,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'auth.middleware.StytchUserSyncMiddleware',
+    # Note: User sync is done in StytchSessionAuthentication class (not middleware)
 ]
 
 ROOT_URLCONF = 'prj_{{{projectName}}}.urls'
@@ -61,12 +61,18 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Stytch Configuration
-STYTCH_PROJECT_ID = os.environ.get('STYTCH_PROJECT_ID', '{{{stytchProjectId}}}')
-STYTCH_SECRET = os.environ.get('STYTCH_SECRET', '')
+# Non-confidential values baked in at generation time (same as Spring)
+STYTCH_PROJECT_ID = '{{{stytchProjectId}}}'
 STYTCH_ROLE_CLAIM_KEY = '{{{roleClaimKey}}}'
 {{#tenantIdClaimKey}}
 STYTCH_TENANT_CLAIM_KEY = '{{{tenantIdClaimKey}}}'
 {{/tenantIdClaimKey}}
+{{^tenantIdClaimKey}}
+STYTCH_TENANT_CLAIM_KEY = ''
+{{/tenantIdClaimKey}}
+
+# Secret is confidential - read from env var (set via AWS Secrets Manager)
+STYTCH_SECRET = os.environ.get('PYTHON_DRF_STYTCH_SECRET', '')
 
 # REST Framework with Stytch Authentication
 REST_FRAMEWORK = {
