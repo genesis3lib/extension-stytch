@@ -38,6 +38,9 @@
       "authentication-provider": {
         "mode": "conflict",
         "notes": "Provides Stytch passwordless authentication across backend and frontend"
+      },
+      "django-settings": {
+        "mode": "append"
       }
     },
     "onConflict": {
