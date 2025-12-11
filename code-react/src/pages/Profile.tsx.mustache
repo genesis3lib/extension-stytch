@@ -1,4 +1,6 @@
 import { useStytchAuth } from '../hooks/useStytchAuth';
+import { AppPageLayout } from '../components/AppPageLayout';
+import { ThemeSelector } from '../components/ThemeSelector';
 
 /**
  * Profile page showing authenticated user information
@@ -13,7 +15,7 @@ export function Profile() {
 
   if (!user) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8">
+      <AppPageLayout>
         <div className="text-center">
           <h1 className="text-2xl font-bold">Not Authenticated</h1>
           <p className="mt-2 text-muted-foreground">Please log in to view your profile.</p>
@@ -21,44 +23,49 @@ export function Profile() {
             Return to Home
           </a>
         </div>
-      </div>
+      </AppPageLayout>
     );
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <div className="rounded-lg border border-border bg-card p-6">
-        <h1 className="text-2xl font-bold">Profile</h1>
+    <AppPageLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Profile</h1>
+          <button
+            onClick={handleLogout}
+            disabled={isLoading}
+            className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors disabled:opacity-50"
+          >
+            {isLoading ? 'Logging out...' : 'Logout'}
+          </button>
+        </div>
 
-        <div className="mt-6 space-y-4">
-          <div>
-            <h2 className="text-sm font-medium text-muted-foreground">User ID</h2>
-            <p className="mt-1 text-foreground">{user.user_id}</p>
-          </div>
+        <div className="border border-border rounded-lg overflow-hidden">
+          <table className="w-full">
+            <tbody className="divide-y divide-border">
+              <tr>
+                <td className="px-4 py-3 font-semibold text-sm bg-muted/50">User ID</td>
+                <td className="px-4 py-3 text-sm">{user.user_id}</td>
+              </tr>
+              {user.emails && user.emails.length > 0 && (
+                <tr>
+                  <td className="px-4 py-3 font-semibold text-sm bg-muted/50">Email</td>
+                  <td className="px-4 py-3 text-sm">{user.emails[0].email}</td>
+                </tr>
+              )}
+              <tr>
+                <td className="px-4 py-3 font-semibold text-sm bg-muted/50">Status</td>
+                <td className="px-4 py-3 text-sm">{user.status}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-          {user.emails && user.emails.length > 0 && (
-            <div>
-              <h2 className="text-sm font-medium text-muted-foreground">Email</h2>
-              <p className="mt-1 text-foreground">{user.emails[0].email}</p>
-            </div>
-          )}
-
-          <div>
-            <h2 className="text-sm font-medium text-muted-foreground">Status</h2>
-            <p className="mt-1 text-foreground">{user.status}</p>
-          </div>
-
-          <div className="pt-4">
-            <button
-              onClick={handleLogout}
-              disabled={isLoading}
-              className="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
-            >
-              {isLoading ? 'Logging out...' : 'Logout'}
-            </button>
-          </div>
+        <div className="border border-border rounded-lg p-6">
+          <ThemeSelector />
         </div>
       </div>
-    </div>
+    </AppPageLayout>
   );
 }
