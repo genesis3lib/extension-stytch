@@ -103,7 +103,8 @@
       "targets": [
         "backend"
       ],
-      "commonForAllEnv": false
+      "commonForAllEnv": false,
+      "gitStoreKey": "STYTCH_SECRET"
     }
   ],
   "dependencies": {
